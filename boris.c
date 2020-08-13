@@ -6,13 +6,7 @@
 ** anneal=A   : whether or not to anneal
 ** smooth=S   : usually try to put a cliff in the data whenever we do iterative tests
 **
-**
-**
-**
  */
-
-
-
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -36,7 +30,6 @@ void init(int who[], double p[][n+1])
             for (int k = 1; k <= kmax; k++) {
                 if (p[i][j] == -1) p[i][j] = 0;
                 p[i][j] += drand48();
-                //printf("%d %d %f %s\n", i, j, p[i][j], f(p[i][j]));
             }
         }
     }
@@ -99,7 +92,6 @@ void swap(int i, int j, double p[][n + 1], double temp[][n + 1])
     }
 }
 
-//TODO: Accept parameters
 int main(int argc, char **argv)
 {
     char *endptr;
@@ -182,7 +174,7 @@ int main(int argc, char **argv)
             if (!anneal && !skip && best < lastBest) return 0;
             lastBest = best;
         }
-        swap(ibest, jbest, p, temp); // BUG OCCURS HERE
+        swap(ibest, jbest, p, temp);
         for (int i = 1; i <= n; i++)
             for (int j = 1; j <= n; j++)
                 p[i][j] = temp[i][j];
