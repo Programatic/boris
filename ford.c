@@ -1,7 +1,7 @@
 /*
-** Usage ./boris n m anneal smooth skip
-** Not filling any in will use defaults
-**  n=N        : problem size and m is the cluster target during set-up
+** Usage ./boris file m [anneal] [smooth] [skip]
+** Not filling any in brackets ([]) will use defaults
+** n=N        : problem size and m is the cluster target during set-up
 ** m=M        : cluster target during set-up
 ** anneal=A   : whether or not to anneal
 ** smooth=S   : usually try to put a cliff in the data whenever we do iterative tests
@@ -15,9 +15,10 @@
 #include <math.h>
 #include <limits.h>
 
+#define CHUNK_SIZE 4096
+
 int n = 20, m = 4, anneal = 1, smooth = 8, skip = 1;
 
-const char *f(double n);
 void init(int who[], double p[][n+1])
 {
     for (int i = 1; i <= n; i++) who[i] = i;
@@ -35,7 +36,7 @@ void init(int who[], double p[][n+1])
     }
 }
 
-const char *f(double n)
+const char *num2color(double n)
 {
     int raw = (int) (n*60.0+0.5);
     if (raw < 0) raw = 0;
@@ -44,7 +45,13 @@ const char *f(double n)
     int second = raw % 16;
     const char key[] = "0123456789ABCDEF";
     char *dest = malloc(7 * sizeof(char));
-    sprintf(dest, "%c%c%c%c%c%c", key[first], key[second], key[first], key[second], key[first], key[second]);
+    dest[0] = key[first];
+    dest[1] = key[second];
+    dest[2] = key[first];
+    dest[3] = key[second];
+    dest[4] = key[first];
+    dest[5] = key[second];
+    dest[6] = '\0';
     return dest;
 }
 
@@ -59,7 +66,7 @@ void display(int who[], double arr[][n+1])
         printf("<tr><td>%d</td>", who[i]);
         char *color;
         for (int j = 1; j <= n; j++) {
-            color = (char *) f(arr[i][j]);
+            color = (char *) num2color(arr[i][j]);
             printf("<td bgcolor=%s width=10 height=5>&nbsp;</td>", color);
             free(color);
         }
@@ -94,35 +101,46 @@ void swap(int i, int j, double p[][n + 1], double temp[][n + 1])
 
 int main(int argc, char **argv)
 {
+    if (argc <= 2) {
+        fprintf(stderr, "No file and nspecified");
+        return 1;
+    }
     char *endptr;
+    FILE *f;
     for (int i = 1; i < argc; i++) {
         int tmp = strtol(argv[i], &endptr, 10);
-        if (i == 1 && !(n = tmp) && endptr == argv[i]) {
-            fprintf(stderr, "INVALID N: %s", argv[i]);
+        if (i == 1 && (f = fopen(argv[i], "r")) == NULL) {
+            fprintf(stderr, "Invalid File: %s", argv[i]);
             return 1;
         }
 
-        if (i == 2 && !(m = tmp) && endptr == argv[i]) {
-            fprintf(stderr, "INVALID M: %s", argv[i]);
+        else if (i == 2 && !(n = tmp) && endptr == argv[i]) {
+            fprintf(stderr, "Invalid N: %s", argv[i]);
             return 1;
         }
 
-        if (i == 3 && !(anneal = tmp) && endptr == argv[i]) {
-            fprintf(stderr, "INVALID ANNEAL: %s", argv[i]);
+        else if (i == 3 && !(m = tmp) && endptr == argv[i]) {
+            fprintf(stderr, "Invalid M: %s", argv[i]);
             return 1;
         }
 
-        if (i == 4 && !(smooth = tmp) && endptr == argv[i]) {
-            fprintf(stderr, "INVALID SMOOTH: %s", argv[i]);
+        else if (i == 4 && !(anneal = tmp) && endptr == argv[i]) {
+            fprintf(stderr, "Invalid Anneal: %s", argv[i]);
             return 1;
         }
 
-        if (i == 5 && !(skip = tmp) && endptr == argv[i]) {
+        else if (i == 5 && !(smooth = tmp) && endptr == argv[i]) {
+            fprintf(stderr, "Invalid Smooth: %s", argv[i]);
+            return 1;
+        }
 
-            fprintf(stderr, "INVALID SKIP: %s", argv[i]);
+        else if (i == 6 && !(skip = tmp) && endptr == argv[i]) {
+
+            fprintf(stderr, "Invalid Skip: %s", argv[i]);
             return 1;
         }
     }
+
 
     srand48(time(0));
     int who[n + 1];
@@ -131,6 +149,25 @@ int main(int argc, char **argv)
         for (int j = 0; j <= n; j++)
             p[i][j] = -1;
     init(who, p);
+
+    char *line = NULL;
+    ssize_t read;
+    size_t len;
+    int i = 1, j = 1;
+    while ((read = getline(&line, &len, f)) != -1) {
+        j = 1;
+        char *token = strtok(line, " ");
+        while (token != NULL && i <= n && j <= n) {
+            double val;
+            sscanf(token, "%lf", &val);
+            p[i][j] = val;
+            token = strtok(NULL, " ");
+            j++;
+        }
+        i++;
+    }
+    fclose(f);
+
 
     printf("Content-type: text/html\n");
     printf("<style>\n");
@@ -149,7 +186,7 @@ int main(int argc, char **argv)
             randstep = 1;
             ibest = jbest = (int) (1. + drand48()*n);
             while (ibest == jbest) jbest = (int) (1. + drand48()*n);
-            printf("<font color=red>taking random step</font>");
+            printf("<font color=red>taking random step </font>");
         } else {
             randstep = 0;
             ibest = jbest = (int) (1 + drand48()*n);
@@ -158,7 +195,7 @@ int main(int argc, char **argv)
             for (int i = 1; i <= n; i++) {
                 for (int j = i + 1; j <= n; j++) {
                     if (skip && drand48() < exp(-(double)ep/(double)smooth)) {
-                        printf("<font color=red>(skipping %d, %d)</font>", i, j);
+                        printf("<font color=red>(skipping %d, %d) </font>", i, j);
                         continue;
                     }
                     swap(i, j, p, temp);
